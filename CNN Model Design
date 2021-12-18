@@ -1,0 +1,159 @@
+# --------------------------------------
+#
+#   딥러닝 / 클라우드 기말고사 대체 과제
+#
+#   32153808 이호국
+#
+# --------------------------------------
+
+
+import os
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Flatten
+from tensorflow.python.keras.layers.convolutional import Convolution2D
+from tensorflow.python.keras.layers.convolutional import MaxPooling2D
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from tensorflow.keras.preprocessing import image
+from tensorflow.keras.utils import to_categorical
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+# --------------------------------------
+#
+#   Initialze
+#
+# --------------------------------------
+
+
+# define image size
+width = 400
+height = 300
+
+# fix random seed for reproductibility
+seed = 123
+np.random.seed(seed)
+num_classes = 4
+
+# set data folder
+img_dir = 'D:\\weather_dataset'
+
+
+# --------------------------------------
+#
+#   Preprocessing
+#
+# --------------------------------------
+
+
+# get file names
+flist = os.listdir(img_dir)
+
+# load images
+X = np.zeros(shape=(len(flist), width, height, 3))
+y = np.zeros(shape=(len(flist)))
+
+for idx, fname in enumerate(flist):
+    img_path = os.path.join(img_dir, fname)
+    img = image.load_img(img_path, target_size=(width, height))
+    img_array_train = image.img_to_array(img)
+    img_array_train = np.expand_dims(img_array_train, axis=0)
+    X[idx] = img_array_train
+    flist[idx] = flist[idx][:2]
+    
+# scaling into [0, 1]
+X = X / 255.0
+
+# reshape X
+X = X.reshape(X.shape[0], width, height, 3)
+
+# encode y
+le = LabelEncoder()
+weather_str = np.array(flist)
+y = le.fit_transform(weather_str).astype('int')
+
+# Split train, test data
+X_train, X_test, y_train, y_test = \
+    train_test_split(X, y, test_size = 0.3, random_state = 123)
+    
+# one hot encoding
+y_train = to_categorical(y_train)
+y_test = to_categorical(y_test)
+
+
+# --------------------------------------
+#
+#   Model Design
+#
+# --------------------------------------
+
+
+# Create CNN model
+def cnn_model():
+    # define model
+    model = Sequential()
+    model.add(Convolution2D(20, kernel_size=(2,2), 
+                            padding = 'valid',
+                            strides=(1,1),
+                            input_shape=(width, height, 3),
+                            activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+    model.add(Convolution2D(24, kernel_size=(2,2), activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+    model.add(Convolution2D(32, kernel_size=(2,2), activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+    model.add(Flatten())
+    model.add(Dense(256, activation = 'relu'))
+    model.add(Dense(64, activation = 'relu'))
+    model.add(Dense(num_classes, activation='softmax'))
+    
+    # Compile model
+    model.compile(loss='categorical_crossentropy',
+                  optimizer='adam',
+                  metrics=['accuracy'])
+    return model
+
+
+# build the model
+model = cnn_model()
+print(model.summary())
+
+
+# --------------------------------------
+#
+#   Model Fitting
+#
+# --------------------------------------
+
+
+# Fit the model
+disp = model.fit(X_train, y_train,
+                 validation_data = (X_test, y_test), 
+                 epochs=30,
+                 batch_size=8,
+                 verbose=1)
+
+
+# --------------------------------------
+#
+#   Model Analyze
+#
+# --------------------------------------
+
+
+# Final evaluation of the model
+scores = model.evaluate(X_test, y_test, verbose = 0)
+print("Test Loss : %.2f" % scores[0])
+print("Test Accuracy : %.2f" % scores[1])
+
+# summarize history for accuracy
+plt.plot(disp.history['accuracy'])
+plt.plot(disp.history['val_accuracy'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'validation'], loc='upper left')
+plt.show()
+
